@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #0a0a1a;
+  color: #c8c8e8;
+  min-height: 100vh;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0d0d2b;
+}
+::-webkit-scrollbar-thumb {
+  background: #1a1a4e;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2a2a6e;
+}
+
+/* Terminal Scan Line Effect */
+.terminal-scan {
+  background: linear-gradient(
+    to bottom,
+    transparent 50%,
+    rgba(0, 240, 255, 0.02) 50%
+  );
+  background-size: 100% 4px;
+}
+
+/* Glow Text */
+.glow-text {
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.6), 0 0 30px rgba(0, 240, 255, 0.3);
+}
+
+/* Grid Background */
+.cosmic-grid {
+  background-image:
+    linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Stars background */
+.stars-bg {
+  background-image: radial-gradient(1px 1px at 20px 30px, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1px 1px at 40px 70px, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1px 1px at 50px 160px, rgba(255,255,255,0.2), transparent),
+    radial-gradient(1px 1px at 90px 40px, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.2), transparent),
+    radial-gradient(1px 1px at 160px 120px, rgba(255,255,255,0.1), transparent);
+}
+
+/* Neon border glow */
+.neon-border {
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.2), 0 0 3px rgba(0, 240, 255, 0.4) inset;
+}
+
+/* Input focus */
+.cosmic-input:focus {
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.3), 0 0 3px rgba(0, 240, 255, 0.5);
+}
+
+/* Forge glow */
+.forge-glow {
+  filter: drop-shadow(0 0 15px rgba(255, 170, 0, 0.6));
+}
+
+/* Drag ghost */
+.drag-ghost {
+  opacity: 0.7;
+  transform: scale(1.05);
+  cursor: grabbing;
+}
+
+/* Drop zone highlight */
+.drop-zone-active {
+  border-color: #00f0ff !important;
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.4), inset 0 0 30px rgba(0, 240, 255, 0.1) !important;
+}
+
+/* Card flip */
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-hover:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.3);
+}
