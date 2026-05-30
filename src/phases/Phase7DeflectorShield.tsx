@@ -2,6 +2,8 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../store/useGameStore';
+import { getRandomSuccessGif } from '../data/gifs';
+import { MissionDebriefing } from '../components/MissionDebriefing';
 
 interface JsonToken {
   id: string;
@@ -25,6 +27,7 @@ export default function Phase7DeflectorShield() {
   const [draggingToken, setDraggingToken] = useState<string | null>(null);
   const [draggingOverSlot, setDraggingOverSlot] = useState<string | null>(null);
   const [phaseCompleted, setPhaseCompleted] = useState(false);
+  const [showDebriefing, setShowDebriefing] = useState(false);
   const [vaultOpen, setVaultOpen] = useState(false);
   const [jsonComplete, setJsonComplete] = useState(false);
 
@@ -61,9 +64,10 @@ export default function Phase7DeflectorShield() {
   }, [blockPublicAccess, phaseCompleted, addScore]);
 
   // Drag handlers for JSON tokens
-  const handleTokenDragStart = (e: React.DragEvent, tokenId: string) => {
-    e.dataTransfer.setData('text/plain', tokenId);
-    e.dataTransfer.effectAllowed = 'move';
+  const handleTokenDragStart = (e: any, tokenId: string) => {
+    const de = e as React.DragEvent;
+    de.dataTransfer.setData('text/plain', tokenId);
+    de.dataTransfer.effectAllowed = 'move';
     setDraggingToken(tokenId);
   };
 
@@ -102,19 +106,18 @@ export default function Phase7DeflectorShield() {
       setJsonComplete(true);
       addScore(100);
       
-      // Complete phase
+      // Trigger debriefing instead of completing directly
       setTimeout(() => {
-        completePhase(7);
         addBadge({
           id: 'shield-commander',
           name: 'Shield Commander',
           icon: '🛡️',
           earnedAt: Date.now(),
         });
-        setPhaseCompleted(true);
+        setShowDebriefing(true);
       }, 1500);
     }
-  }, [placedTokens, addScore, checkJsonCorrect, completePhase, addBadge]);
+  }, [placedTokens, addScore, checkJsonCorrect, addBadge]);
 
   // Allow removing placed tokens
   const handleRemoveToken = useCallback((slot: string) => {
@@ -391,6 +394,11 @@ export default function Phase7DeflectorShield() {
             className="absolute inset-0 bg-cosmic-bg/80 flex items-center justify-center rounded-xl z-20"
           >
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-center">
+              <img
+                src={getRandomSuccessGif()}
+                alt="Success"
+                className="w-56 h-56 object-contain rounded-2xl mx-auto mb-3 border-2 border-cosmic-success/50 shadow-[0_0_30px_rgba(0,255,136,0.3)] bg-black/20"
+              />
               <motion.span
                 animate={{ rotate: [0, 360] }}
                 transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
@@ -411,6 +419,28 @@ export default function Phase7DeflectorShield() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── MISSION DEBRIEFING ─────────────────────────────── */}
+      <MissionDebriefing
+        phaseNumber={7}
+        phaseTitle="The Deflector Shield"
+        completedSteps={[
+          'Disabled Block Public Access on S3 bucket',
+          'Constructed IAM bucket policy with correct principals and actions',
+        ]}
+        realWorldImpact="S3 is locked down by default. To host a public website, you must explicitly disable the public access block AND attach a bucket policy granting s3:GetObject to all principals. This is a two-step security measure."
+        keyTakeaways={[
+          'Block Public Access is ON by default for security',
+          'Bucket policies use JSON with Effect, Principal, and Action',
+          'Least privilege: only grant s3:GetObject, nothing else',
+        ]}
+        awsComparison="EC2 instances require Security Group rules (firewall), while S3 requires bucket policies (IAM-level). Both are defense-in-depth layers, but operate at different levels of the AWS stack."
+        onComplete={() => {
+          setShowDebriefing(false);
+          completePhase(7);
+        }}
+        isOpen={showDebriefing}
+      />
     </div>
   );
 }

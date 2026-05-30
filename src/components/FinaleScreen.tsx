@@ -170,7 +170,7 @@ export default function FinaleScreen({ onClose }: FinaleScreenProps) {
                   <p>🌟 <span className="text-cosmic-muted">Phase 5:</span> S3 bucket created with unique DNS name</p>
                   <p>📦 <span className="text-cosmic-muted">Phase 6:</span> Static assets uploaded with correct metadata</p>
                   <p>🛡️ <span className="text-cosmic-muted">Phase 7:</span> Public access policy configured securely</p>
-                  <p>⚔️ <span className="text-cosmic-muted">Phase 8:</span> EC2 vs S3 mastery demonstrated</p>
+                  <p>⚔️ <span className="text-cosmic-muted">Phase 8:</span> 5-question quiz covering all mission phases</p>
                 </div>
               </motion.div>
 

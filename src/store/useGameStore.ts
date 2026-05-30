@@ -69,12 +69,9 @@ export const useGameStore = create<GameState>((set) => ({
     }),
 
   goToPhase: (phase: number) =>
-    set((state) => {
-      // Can only go to phase if previous is completed or it's phase 1
-      if (phase === 1 || state.completedPhases.has(phase - 1)) {
-        return { currentPhase: phase };
-      }
-      return {};
+    set(() => {
+      // Allow free navigation to any phase
+      return { currentPhase: phase };
     }),
 
   addScore: (points: number) =>
