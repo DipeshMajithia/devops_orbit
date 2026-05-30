@@ -2,6 +2,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../store/useGameStore';
+import { getRandomFailureGif, getRandomSuccessGif } from '../data/gifs';
+import { MissionDebriefing } from '../components/MissionDebriefing';
 
 const TARGET_COMMAND = 'ssh -i orbital-key.pem ubuntu@13.233.4.100';
 const EXPECTED_PROMPT = 'Type command to connect using orbital-key.pem:';
@@ -12,10 +14,30 @@ export default function Phase3HyperTerminal() {
   const [connectionProgress, setConnectionProgress] = useState(0); // 0-100
   const [phaseCompleted, setPhaseCompleted] = useState(false);
   const [showBeam, setShowBeam] = useState(false);
+  const [showDebriefing, setShowDebriefing] = useState(false);
   const [typingError, setTypingError] = useState(false);
+  const [errorCount, setErrorCount] = useState(0);
+  const [showRoast, setShowRoast] = useState(false);
+  const [roast, setRoast] = useState<{ text: string; gifUrl: string } | null>(null);
+  const [successGif, setSuccessGif] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const hasAutoCompleted = useRef(false);
+
+  const SSH_ROASTS = [
+    { text: "Bro, SSH commands aren't emojis! Type it properly! 😤" },
+    { text: "You're hacking... jk, that's not even close! 🔐" },
+    { text: "Are you trying to connect via telepathy? Type the command! 🧠" },
+    { text: "SSH syntax left the chat. Try again! 📡" },
+    { text: "Your keyboard drunk? That's not the SSH command! 🍺" },
+    { text: "Chalo chalo, focus! Permission denied vibes already! 🚫" },
+  ];
+
+  const showRoastFor = (text: string) => {
+    setRoast({ text, gifUrl: getRandomFailureGif() });
+    setShowRoast(true);
+    setTimeout(() => setShowRoast(false), 10000);
+  };
 
   // Auto-focus input
   useEffect(() => {
@@ -25,7 +47,7 @@ export default function Phase3HyperTerminal() {
   // Validate character-by-character as user types
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (phaseCompleted || hasAutoCompleted.current) return;
-    
+
     const newValue = e.target.value;
     setUserInput(newValue);
 
@@ -34,6 +56,15 @@ export default function Phase3HyperTerminal() {
     if (newValue !== targetPrefix) {
       // Mismatch detected
       setTypingError(true);
+      setErrorCount(prev => {
+        const newCount = prev + 1;
+        // Show roast after 3+ errors
+        if (newCount >= 3 && newCount % 3 === 0) {
+          const randomRoast = SSH_ROASTS[Math.floor(Math.random() * SSH_ROASTS.length)];
+          showRoastFor(randomRoast.text);
+        }
+        return newCount;
+      });
       setTimeout(() => setTypingError(false), 500);
       // Don't update if it doesn't match
       return;
@@ -54,18 +85,11 @@ export default function Phase3HyperTerminal() {
       setConnectionProgress(100);
       setShowBeam(true);
       hasAutoCompleted.current = true;
-      
+
       // Success!
       setTimeout(() => {
-        completePhase(3);
-        addScore(200);
-        addBadge({
-          id: 'terminal-ninja',
-          name: 'Terminal Ninja',
-          icon: '💻',
-          earnedAt: Date.now(),
-        });
         setPhaseCompleted(true);
+        setShowDebriefing(true);
       }, 1200);
     }
   }, [phaseCompleted, completePhase, addScore, addBadge]);
@@ -74,7 +98,7 @@ export default function Phase3HyperTerminal() {
   const getColoredCommand = () => {
     const correctPortion = TARGET_COMMAND.substring(0, userInput.length);
     const remainingPortion = TARGET_COMMAND.substring(userInput.length);
-    
+
     return (
       <span className="text-xs font-mono">
         {userInput.split('').map((char, i) => {
@@ -131,12 +155,12 @@ export default function Phase3HyperTerminal() {
               transition={{ duration: 0.3 }}
             />
           </div>
-          
+
           {/* Animated particles in the beam */}
           {showBeam && connectionProgress > 0 && connectionProgress < 100 && (
             <motion.div
               className="absolute top-1/2 -translate-y-1/2"
-              animate={{ 
+              animate={{
                 left: ['0%', `${connectionProgress}%`],
                 opacity: [1, 0.5, 1],
               }}
@@ -148,9 +172,8 @@ export default function Phase3HyperTerminal() {
 
           {/* Connection percentage */}
           <div className="absolute -bottom-6 left-1/2 -translate-x-1/2">
-            <span className={`text-[10px] font-mono ${
-              connectionProgress === 100 ? 'text-cosmic-success' : 'text-cosmic-accent'
-            }`}>
+            <span className={`text-[10px] font-mono ${connectionProgress === 100 ? 'text-cosmic-success' : 'text-cosmic-accent'
+              }`}>
               {connectionProgress}%
             </span>
           </div>
@@ -159,18 +182,17 @@ export default function Phase3HyperTerminal() {
         {/* Cloud Server */}
         <motion.div
           className="flex flex-col items-center"
-          animate={connectionProgress === 100 ? { 
+          animate={connectionProgress === 100 ? {
             boxShadow: ['0 0 10px rgba(0,255,136,0.4)', '0 0 25px rgba(0,255,136,0.8)', '0 0 10px rgba(0,255,136,0.4)']
           } : {}}
           transition={{ duration: 1, repeat: connectionProgress === 100 ? Infinity : 0 }}
         >
-          <div className={`w-16 h-16 border-2 rounded-xl flex items-center justify-center text-3xl ${
-            connectionProgress === 100 
-              ? 'bg-cosmic-success/10 border-cosmic-success' 
-              : connectionProgress > 0 
-                ? 'bg-cosmic-panel border-cosmic-accent/50' 
+          <div className={`w-16 h-16 border-2 rounded-xl flex items-center justify-center text-3xl ${connectionProgress === 100
+              ? 'bg-cosmic-success/10 border-cosmic-success'
+              : connectionProgress > 0
+                ? 'bg-cosmic-panel border-cosmic-accent/50'
                 : 'bg-cosmic-panel border-cosmic-border'
-          }`}>
+            }`}>
             ☁️
           </div>
           <span className="text-[10px] font-mono text-cosmic-muted mt-2">REMOTE</span>
@@ -193,7 +215,7 @@ export default function Phase3HyperTerminal() {
         </div>
 
         {/* Terminal Body */}
-        <div 
+        <div
           ref={terminalRef}
           className="p-4 min-h-[200px] font-mono text-sm terminal-scan"
         >
@@ -312,6 +334,11 @@ export default function Phase3HyperTerminal() {
               animate={{ scale: 1 }}
               className="text-center"
             >
+              <img
+                src={getRandomSuccessGif()}
+                alt="Success"
+                className="w-56 h-56 object-contain rounded-2xl mx-auto mb-3 border-2 border-cosmic-success/50 shadow-[0_0_30px_rgba(0,255,136,0.3)] bg-black/20"
+              />
               <motion.span
                 animate={{ rotate: 360 }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
@@ -329,6 +356,82 @@ export default function Phase3HyperTerminal() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── ROAST OVERLAY ──────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showRoast && roast && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none"
+          >
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0 }}
+              transition={{ type: 'spring', damping: 12, stiffness: 200 }}
+              className="bg-cosmic-dark/90 border-2 border-cosmic-danger/60 rounded-2xl p-5 max-w-sm w-full shadow-[0_0_30px_rgba(255,51,102,0.4)] pointer-events-auto"
+            >
+              <div className="mb-3 rounded-xl overflow-hidden border border-cosmic-danger/30">
+                <img src={roast.gifUrl} alt="roast" className="w-full h-40 object-contain bg-black/30" />
+              </div>
+              <p className="text-lg font-bold text-cosmic-danger text-center glow-text">
+                {roast.text}
+              </p>
+              <p className="text-[9px] font-mono text-cosmic-muted text-center mt-2">
+                Try again in 10 seconds...
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── MISSION DEBRIEFING ── */}
+      <AnimatePresence>
+          {showDebriefing && (
+            <MissionDebriefing
+              phase={3}
+              title="The Hyper-Terminal — SSH Connection"
+              emoji="💻"
+              badge={{ id: 'terminal-ninja', name: 'Terminal Ninja', icon: '💻' }}
+              score={200}
+              sections={[
+                {
+                  title: '🔐 Asymmetric Cryptography',
+                  items: ['SSH uses public/private key pair authentication', 'The .pem file contains your private key (never share it!)', 'AWS stores the public key on your EC2 instance at ~/.ssh/authorized_keys', 'When you connect, SSH proves you hold the private key without ever sending it'],
+                  icon: '🔑',
+                },
+                {
+                  title: '🖥️ SSH Command Anatomy',
+                  items: ['ssh = Secure Shell protocol client', '-i orbital-key.pem = "Use this identity file as my key"', 'ubuntu@13.233.4.100 = "Log in as user ubuntu at this IP"', 'Port 22 is the default SSH port'],
+                  icon: '📝',
+                },
+                {
+                  title: '🌐 What Just Happened',
+                  items: ['Your local machine opened an encrypted TCP tunnel to the EC2 instance', 'The server challenged you to prove you own the private key', 'Your SSH client signed a challenge with the .pem key without revealing it', 'You now have a remote shell running on an Ubuntu server in the cloud!'],
+                  icon: '🔗',
+                },
+                {
+                  title: '📋 Next Steps',
+                  items: ['You are now inside a fresh Ubuntu 24.04 server', 'No web server is running yet — the instance is "dark"', 'Phase 4 will teach you to install Nginx and open firewall ports'],
+                  icon: '➡️',
+                },
+              ]}
+              onContinue={() => {
+                setShowDebriefing(false);
+                completePhase(3);
+                addScore(200);
+                addBadge({
+                  id: 'terminal-ninja',
+                  name: 'Terminal Ninja',
+                  icon: '💻',
+                  earnedAt: Date.now(),
+                });
+              }}
+            />
+          )}
+        </AnimatePresence>
     </div>
   );
 }

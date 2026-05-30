@@ -2,6 +2,8 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../store/useGameStore';
+import { getRandomSuccessGif } from '../data/gifs';
+import { MissionDebriefing } from '../components/MissionDebriefing';
 
 interface StaticAsset {
   id: string;
@@ -28,6 +30,7 @@ export default function Phase6TractorBeam() {
   const [draggingAsset, setDraggingAsset] = useState<string | null>(null);
   const [snapAnimations, setSnapAnimations] = useState<Set<string>>(new Set());
   const [phaseCompleted, setPhaseCompleted] = useState(false);
+  const [showDebriefing, setShowDebriefing] = useState(false);
   const [showMetadata, setShowMetadata] = useState<Record<string, boolean>>({});
 
   // Check if all vital assets are uploaded
@@ -38,9 +41,10 @@ export default function Phase6TractorBeam() {
   // Check all assets uploaded
   const allUploaded = allAssets.every((a) => uploadedFiles.includes(a.id));
 
-  const handleDragStart = (e: React.DragEvent, assetId: string) => {
-    e.dataTransfer.setData('text/plain', assetId);
-    e.dataTransfer.effectAllowed = 'move';
+  const handleDragStart = (e: any, assetId: string) => {
+    const de = e as React.DragEvent;
+    de.dataTransfer.setData('text/plain', assetId);
+    de.dataTransfer.effectAllowed = 'move';
     setDraggingAsset(assetId);
   };
 
@@ -88,7 +92,6 @@ export default function Phase6TractorBeam() {
   // Check for phase completion
   const handleComplete = useCallback(() => {
     if (allVitalUploaded && !phaseCompleted) {
-      completePhase(6);
       addScore(50);
       addBadge({
         id: 'tractor-operator',
@@ -96,9 +99,9 @@ export default function Phase6TractorBeam() {
         icon: '📦',
         earnedAt: Date.now(),
       });
-      setPhaseCompleted(true);
+      setShowDebriefing(true);
     }
-  }, [allVitalUploaded, phaseCompleted, completePhase, addScore, addBadge]);
+  }, [allVitalUploaded, phaseCompleted, addScore, addBadge]);
 
   // Trigger completion check when vital files are uploaded
   if (allVitalUploaded && !phaseCompleted) {
@@ -294,6 +297,11 @@ export default function Phase6TractorBeam() {
             className="absolute inset-0 bg-cosmic-bg/80 flex items-center justify-center rounded-xl z-20"
           >
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-center">
+              <img
+                src={getRandomSuccessGif()}
+                alt="Success"
+                className="w-56 h-56 object-contain rounded-2xl mx-auto mb-3 border-2 border-cosmic-success/50 shadow-[0_0_30px_rgba(0,255,136,0.3)] bg-black/20"
+              />
               <motion.span
                 animate={{ y: [0, -15, 0] }}
                 transition={{ duration: 2, repeat: Infinity }}
@@ -311,6 +319,28 @@ export default function Phase6TractorBeam() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── MISSION DEBRIEFING ─────────────────────────────── */}
+      <MissionDebriefing
+        phaseNumber={6}
+        phaseTitle="The Tractor Beam"
+        completedSteps={[
+          'Uploaded all static assets to S3',
+          'Attached proper Content-Type metadata',
+        ]}
+        realWorldImpact="S3's flat object storage treats each file as a key-value pair. Unlike a traditional filesystem with directories, S3 uses prefixes for organization. Metadata like Content-Type is critical for browsers to render files correctly."
+        keyTakeaways={[
+          'S3 has a flat structure — folders are just key prefixes',
+          'Always set correct Content-Type headers for web assets',
+          'Static websites on S3 require all files to be publicly accessible',
+        ]}
+        awsComparison="Unlike EC2 where you SSH in and use a filesystem, S3 objects are managed via API calls and are inherently serverless. You never 'connect' to S3 — you request objects by URL."
+        onComplete={() => {
+          setShowDebriefing(false);
+          completePhase(6);
+        }}
+        isOpen={showDebriefing}
+      />
     </div>
   );
 }

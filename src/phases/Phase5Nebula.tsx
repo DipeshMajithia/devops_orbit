@@ -2,6 +2,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../store/useGameStore';
+import { getRandomFailureGif, getRandomSuccessGif } from '../data/gifs';
+import { MissionDebriefing } from '../components/MissionDebriefing';
 
 // Common words that are "already taken" globally
 const TAKEN_NAMES = new Set([
@@ -19,6 +21,15 @@ const HAS_UPPERCASE = /[A-Z]/;
 const HAS_SPACE = /\s/;
 const HAS_SPECIAL = /[^a-z0-9-]/;
 
+const BUCKET_ROASTS = [
+  { text: "UPPERCASE? S3 thinks you're SHOUTING! Lowercase only bhai! 😤" },
+  { text: "Spaces in bucket name? It's not a novel, it's a bucket! 📖" },
+  { text: "Special characters? S3 bucket names are like passwords — keep it simple! 🔑" },
+  { text: "That name is taken globally! You're not special enough! 🌍" },
+  { text: "Bro, S3 buckets are global. Someone already stole your name! 😱" },
+  { text: "Arre, think unique! Even our interstellar buckets are running out of names! 🛸" },
+];
+
 export default function Phase5Nebula() {
   const { completePhase, addScore, addBadge, bucketName, setBucketName } = useGameStore();
   const [inputValue, setInputValue] = useState('');
@@ -27,8 +38,18 @@ export default function Phase5Nebula() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successGlow, setSuccessGlow] = useState(false);
   const [phaseCompleted, setPhaseCompleted] = useState(false);
+  const [showDebriefing, setShowDebriefing] = useState(false);
   const [nebulaParticles, setNebulaParticles] = useState<{ x: number; y: number; size: number; delay: number }[]>([]);
+  const [errorCount, setErrorCount] = useState(0);
+  const [showRoast, setShowRoast] = useState(false);
+  const [roast, setRoast] = useState<{ text: string; gifUrl: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const showRoastFor = (text: string) => {
+    setRoast({ text, gifUrl: getRandomFailureGif() });
+    setShowRoast(true);
+    setTimeout(() => setShowRoast(false), 10000);
+  };
 
   // Generate nebula particles on mount
   useEffect(() => {
@@ -125,12 +146,25 @@ export default function Phase5Nebula() {
     if (phaseCompleted) return;
     const val = e.target.value;
     setInputValue(val);
-    validateName(val);
+    const isValid = validateName(val);
+    if (!isValid && val.length > 0) {
+      setErrorCount(prev => {
+        const newCount = prev + 1;
+        if (newCount >= 3) {
+          const roastMsg = BUCKET_ROASTS[Math.floor(Math.random() * BUCKET_ROASTS.length)];
+          showRoastFor(roastMsg.text);
+          return 0; // reset counter after roast
+        }
+        return newCount;
+      });
+    } else if (isValid) {
+      setErrorCount(0);
+    }
   };
 
   const handleCreateBucket = useCallback(() => {
     if (phaseCompleted) return;
-    
+
     if (!inputValue) {
       setErrorMessage('⚠️ Please enter a bucket name.');
       setShakeInput(true);
@@ -144,21 +178,20 @@ export default function Phase5Nebula() {
     // All validations pass!
     setValidating(true);
     setBucketName(inputValue);
-    
+
     setTimeout(() => {
       setValidating(false);
       setSuccessGlow(true);
       addScore(150);
-      
+
       setTimeout(() => {
-        completePhase(5);
         addBadge({
           id: 'nebula-weaver',
           name: 'Nebula Weaver',
           icon: '🌟',
           earnedAt: Date.now(),
         });
-        setPhaseCompleted(true);
+        setShowDebriefing(true);
       }, 1500);
     }, 1200);
   }, [inputValue, phaseCompleted, validateName, setBucketName, completePhase, addScore, addBadge]);
@@ -231,13 +264,12 @@ export default function Phase5Nebula() {
 
         {/* Core */}
         <motion.div
-          className={`w-24 h-24 rounded-full flex items-center justify-center text-4xl border-2 transition-all duration-700 ${
-            validating
+          className={`w-24 h-24 rounded-full flex items-center justify-center text-4xl border-2 transition-all duration-700 ${validating
               ? 'bg-cosmic-warning/20 border-cosmic-warning animate-forge-spin'
               : successGlow
                 ? 'bg-cosmic-success/20 border-cosmic-success'
                 : 'bg-cosmic-glow/10 border-cosmic-glow/50'
-          }`}
+            }`}
         >
           {validating ? '⏳' : successGlow ? '🌟' : '💫'}
         </motion.div>
@@ -248,7 +280,7 @@ export default function Phase5Nebula() {
         <label className="text-xs font-mono text-cosmic-accent mb-2 block">
           BUCKET NAME (globally unique, lowercase, 3-63 chars)
         </label>
-        
+
         <motion.div
           animate={shakeInput ? { x: [0, -5, 5, -5, 5, 0] } : {}}
           className="relative"
@@ -265,22 +297,21 @@ export default function Phase5Nebula() {
               w-full bg-cosmic-bg border px-4 py-3 rounded-lg font-mono text-sm outline-none
               transition-all duration-300 cosmic-input
               ${shakeInput ? 'border-cosmic-danger text-cosmic-danger' : ''}
-              ${!errorMessage && inputValue.length >= 3 
-                ? 'border-cosmic-success text-cosmic-success' 
+              ${!errorMessage && inputValue.length >= 3
+                ? 'border-cosmic-success text-cosmic-success'
                 : 'border-cosmic-border text-cosmic-text'}
               ${successGlow ? 'border-cosmic-success bg-cosmic-success/5' : ''}
             `}
             spellCheck={false}
           />
-          
+
           {/* Real-time character count & validation icon */}
           {inputValue && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-              <span className={`text-[10px] font-mono ${
-                inputValue.length < 3 || inputValue.length > 63 
-                  ? 'text-cosmic-danger' 
+              <span className={`text-[10px] font-mono ${inputValue.length < 3 || inputValue.length > 63
+                  ? 'text-cosmic-danger'
                   : 'text-cosmic-muted'
-              }`}>
+                }`}>
                 {inputValue.length}/63
               </span>
               {!errorMessage && inputValue.length >= 3 && validating === false && (
@@ -349,9 +380,9 @@ export default function Phase5Nebula() {
                 : 'bg-cosmic-glow/20 border-2 border-cosmic-glow text-cosmic-glow hover:bg-cosmic-glow/30'
             }
           `}
-          whileHover={!phaseCompleted && !validating && inputValue && !errorMessage ? { 
-            scale: 1.02, 
-            boxShadow: '0 0 25px rgba(123,47,255,0.5)' 
+          whileHover={!phaseCompleted && !validating && inputValue && !errorMessage ? {
+            scale: 1.02,
+            boxShadow: '0 0 25px rgba(123,47,255,0.5)'
           } : {}}
           whileTap={!phaseCompleted && !validating ? { scale: 0.98 } : {}}
         >
@@ -380,8 +411,13 @@ export default function Phase5Nebula() {
             className="absolute inset-0 bg-cosmic-bg/80 flex items-center justify-center rounded-xl z-20"
           >
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-center">
+              <img
+                src={getRandomSuccessGif()}
+                alt="Success"
+                className="w-56 h-56 object-contain rounded-2xl mx-auto mb-3 border-2 border-cosmic-success/50 shadow-[0_0_30px_rgba(0,255,136,0.3)] bg-black/20"
+              />
               <motion.span
-                animate={{ 
+                animate={{
                   scale: [1, 1.2, 1],
                   rotate: [0, 360],
                 }}
@@ -400,6 +436,58 @@ export default function Phase5Nebula() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── ROAST OVERLAY ──────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showRoast && roast && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none"
+          >
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0 }}
+              transition={{ type: 'spring', damping: 12, stiffness: 200 }}
+              className="bg-cosmic-dark/90 border-2 border-cosmic-danger/60 rounded-2xl p-5 max-w-sm w-full shadow-[0_0_30px_rgba(255,51,102,0.4)] pointer-events-auto"
+            >
+              <div className="mb-3 rounded-xl overflow-hidden border border-cosmic-danger/30">
+                <img src={roast.gifUrl} alt="roast" className="w-full h-40 object-contain bg-black/30" />
+              </div>
+              <p className="text-lg font-bold text-cosmic-danger text-center glow-text">
+                {roast.text}
+              </p>
+              <p className="text-[9px] font-mono text-cosmic-muted text-center mt-2">
+                Try a unique name...
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── MISSION DEBRIEFING ─────────────────────────────── */}
+      <MissionDebriefing
+        phaseNumber={5}
+        phaseTitle="The Nebula Artifact"
+        completedSteps={[
+          'Validated S3 bucket naming conventions',
+          'Created globally unique bucket name',
+        ]}
+        realWorldImpact="S3 bucket names must be DNS-compliant (lowercase, no spaces, no special chars) and globally unique across all AWS accounts. Proper naming prevents provisioning failures and is the first step to hosting a static site."
+        keyTakeaways={[
+          'Bucket names are a global namespace — you compete with every AWS user',
+          'Only lowercase letters, numbers, hyphens, and dots (no underscores)',
+          'S3 is fundamentally serverless — there is no OS to manage',
+        ]}
+        awsComparison="Unlike EC2 where you provision virtual servers, S3 requires you to 'claim' a globally unique identifier — similar to registering a domain name. The namespace is shared by all AWS users."
+        onComplete={() => {
+          setShowDebriefing(false);
+          completePhase(5);
+        }}
+        isOpen={showDebriefing}
+      />
     </div>
   );
 }

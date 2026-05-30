@@ -2,37 +2,97 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../store/useGameStore';
+import { getRandomFailureGif, getRandomSuccessGif } from '../data/gifs';
 
-interface BattleRound {
+interface QuizQuestion {
   id: number;
-  scenario: string;
-  clientIcon: string;
-  correctCard: 'ec2' | 's3';
+  question: string;
+  emoji: string;
+  options: string[];
+  correctIndex: number;
   explanation: string;
+  sourcePhase: number;
 }
 
-const battleRounds: BattleRound[] = [
+const quizQuestions: QuizQuestion[] = [
   {
     id: 1,
-    scenario: 'We need a scalable runtime environment to host a dynamic Node.js backend API with database access.',
-    clientIcon: '🏢',
-    correctCard: 'ec2',
-    explanation: 'EC2 provides a full OS environment where you can install Node.js, configure databases, and run server-side code.',
+    question: 'Why did you select a specific AWS Region in Phase 1 (Mission Control)?',
+    emoji: '🌍',
+    options: [
+      'To get the coolest regional domain name',
+      'To minimize latency by choosing the region closest to users',
+      'Because all AWS services are only available in us-east-1',
+      'Regions are just for billing — they don\'t affect performance',
+    ],
+    correctIndex: 1,
+    explanation: 'AWS Regions are physically isolated geographic areas. Choosing the closest region to your users reduces latency and improves load times!',
+    sourcePhase: 1,
   },
   {
     id: 2,
-    scenario: 'We need to host a global React landing page cheaply, requiring absolutely zero OS patch maintenance.',
-    clientIcon: '🌐',
-    correctCard: 's3',
-    explanation: 'S3 static website hosting is serverless — no servers to patch, and you only pay for storage/bandwidth.',
+    question: 'In Phase 2 (The Forge), what file permission did you set for orbital-key.pem and why?',
+    emoji: '🔑',
+    options: [
+      '777 — so anyone can use the key freely',
+      '644 — just standard file permissions',
+      '400 — owner read-only, because SSH rejects keys with loose permissions',
+      '000 — the key encrypts itself automatically',
+    ],
+    correctIndex: 2,
+    explanation: 'SSH strictly requires private keys to have 400 (read-only for owner). Any broader permissions (like 644 or 777) and SSH will refuse to connect!',
+    sourcePhase: 2,
   },
   {
     id: 3,
-    scenario: 'Our web traffic spiked 500% in 2 minutes; we need instant, infinite scaling of static files with no scaling configuration.',
-    clientIcon: '📈',
-    correctCard: 's3',
-    explanation: 'S3 automatically scales to handle any traffic spike without any configuration — true serverless elasticity.',
+    question: 'What does Nginx do on your EC2 instance (Phase 4: Engine Room)?',
+    emoji: '⚙️',
+    options: [
+      'It\'s a database engine that stores user passwords',
+      'It\'s a web server that handles HTTP requests and serves static files or proxies to backends',
+      'It replaces the Ubuntu operating system entirely',
+      'It blocks all incoming internet traffic by default',
+    ],
+    correctIndex: 1,
+    explanation: 'Nginx is a high-performance web server & reverse proxy. It listens on Port 80, serves static files directly, and can forward dynamic requests to your backend app!',
+    sourcePhase: 4,
   },
+  {
+    id: 4,
+    question: 'Why must an S3 bucket name be globally unique and lowercase (Phase 5: Nebula Artifact)?',
+    emoji: '🪣',
+    options: [
+      'Because S3 is just picky about aesthetics',
+      'S3 bucket names become part of a global DNS hostname — DNS requires lowercase and uniqueness',
+      'Uppercase letters corrupt the stored objects',
+      'Only the us-east-1 region enforces this rule',
+    ],
+    correctIndex: 1,
+    explanation: 'Your bucket name becomes http://<bucket>.s3.amazonaws.com. DNS names must be lowercase and globally unique across ALL AWS accounts worldwide!',
+    sourcePhase: 5,
+  },
+  {
+    id: 5,
+    question: 'You have a Node.js backend API with a PostgreSQL database. Which AWS service should you use to host it?',
+    emoji: '🏗️',
+    options: [
+      'S3 — because it\'s serverless and cheaper',
+      'EC2 — because you need a full OS to run Node.js, npm, and connect to databases',
+      'Both S3 and EC2 work identically for backends',
+      'Neither — you should just use your laptop',
+    ],
+    correctIndex: 1,
+    explanation: 'S3 is for static files (HTML/CSS/JS/images). For dynamic server-side code like Node.js with database access, you need EC2 — a full virtual machine with an OS!',
+    sourcePhase: 8,
+  },
+];
+
+const QUIZ_ROASTS = [
+  { text: "Wrong answer, pilot! Read the question carefully! 🤦" },
+  { text: "That's not it! Think about what you learned in the mission! 🧠" },
+  { text: "Close, but no! The answer is in the debriefing notes! 📚" },
+  { text: "Even the AI opponent is laughing at that one! 😂" },
+  { text: "Aree bhai! You learned this in the simulation! Recall it! 🤔" },
 ];
 
 export default function Phase8CosmicShowdown() {
@@ -46,276 +106,303 @@ export default function Phase8CosmicShowdown() {
     incrementCardBattleCorrect,
   } = useGameStore();
 
-  const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
-  const [selectedCard, setSelectedCard] = useState<'ec2' | 's3' | null>(null);
-  const [roundResult, setRoundResult] = useState<'correct' | 'incorrect' | null>(null);
+  const TOTAL_QUESTIONS = quizQuestions.length;
+
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [questionResult, setQuestionResult] = useState<'correct' | 'incorrect' | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [phaseCompleted, setPhaseCompleted] = useState(false);
-  const [shakeCard, setShakeCard] = useState<'ec2' | 's3' | null>(null);
+  const [shakeOption, setShakeOption] = useState<number | null>(null);
+  const [showRoast, setShowRoast] = useState(false);
+  const [roast, setRoast] = useState<{ text: string; gifUrl: string } | null>(null);
+  const [errorCount, setErrorCount] = useState(0);
+  const [localCorrect, setLocalCorrect] = useState(0);
+  const [celebrating, setCelebrating] = useState(false);
 
-  const currentRound = battleRounds[currentRoundIndex];
-  const isLastRound = currentRoundIndex >= 2;
-  const allCorrect = cardBattleCorrect >= 3;
+  const showRoastFor = (text: string) => {
+    setRoast({ text, gifUrl: getRandomFailureGif() });
+    setShowRoast(true);
+    setTimeout(() => setShowRoast(false), 10000);
+  };
 
-  const handlePlayCard = useCallback((card: 'ec2' | 's3') => {
-    if (selectedCard || phaseCompleted) return;
-    setSelectedCard(card);
+  const currentQuestion = quizQuestions[currentQuestionIndex];
+  const isLastQuestion = currentQuestionIndex >= TOTAL_QUESTIONS - 1;
+  const allQuestionsAnswered = currentQuestionIndex >= TOTAL_QUESTIONS;
 
-    const isCorrect = card === currentRound.correctCard;
-    
-    if (isCorrect) {
-      setRoundResult('correct');
-      incrementCardBattleCorrect();
-      setShowExplanation(true);
-      addScore(100);
-    } else {
-      setRoundResult('incorrect');
-      setShakeCard(card);
-      setTimeout(() => {
-        setShakeCard(null);
-        setSelectedCard(null);
-        setRoundResult(null);
-      }, 800);
-      // Penalty
-      addScore(-25);
-    }
-  }, [selectedCard, phaseCompleted, currentRound, incrementCardBattleCorrect, addScore]);
+  const handleSelectOption = useCallback(
+    (optionIndex: number) => {
+      if (selectedOption !== null || phaseCompleted) return;
+      setSelectedOption(optionIndex);
 
-  const handleNextRound = useCallback(() => {
-    if (isLastRound) {
-      // All 3 rounds complete
-      incrementCardBattleRound();
-      if (allCorrect || (cardBattleCorrect + (roundResult === 'correct' ? 1 : 0) >= 3)) {
-        // Victory
+      const isCorrect = optionIndex === currentQuestion.correctIndex;
+
+      if (isCorrect) {
+        setQuestionResult('correct');
+        incrementCardBattleCorrect();
+        setLocalCorrect((prev) => prev + 1);
+        setShowExplanation(true);
+        addScore(80);
+        setCelebrating(true);
+        setTimeout(() => setCelebrating(false), 2000);
+      } else {
+        setQuestionResult('incorrect');
+        setShakeOption(optionIndex);
+        addScore(-15);
+        setErrorCount((prev) => {
+          const newCount = prev + 1;
+          if (newCount >= 2) {
+            const roastMsg = QUIZ_ROASTS[Math.floor(Math.random() * QUIZ_ROASTS.length)];
+            showRoastFor(roastMsg.text);
+            return 0;
+          }
+          return newCount;
+        });
         setTimeout(() => {
-          completePhase(8);
-          addScore(300);
-          addBadge({
-            id: 'cosmic-pilot',
-            name: 'Cosmic Cloud Pilot',
-            icon: '⚔️',
-            earnedAt: Date.now(),
-          });
-          setPhaseCompleted(true);
-        }, 500);
+          setShakeOption(null);
+          setSelectedOption(null);
+          setQuestionResult(null);
+        }, 1000);
       }
+    },
+    [selectedOption, phaseCompleted, currentQuestion, incrementCardBattleCorrect, addScore],
+  );
+
+  const handleNextQuestion = useCallback(() => {
+    if (isLastQuestion) {
+      // Quiz complete — victory!
+      incrementCardBattleRound();
+      completePhase(8);
+      addScore(200);
+      addBadge({
+        id: 'cosmic-pilot',
+        name: 'Cosmic Cloud Pilot',
+        icon: '⚔️',
+        earnedAt: Date.now(),
+      });
+      setPhaseCompleted(true);
     } else {
       incrementCardBattleRound();
-      setCurrentRoundIndex((prev) => prev + 1);
-      setSelectedCard(null);
-      setRoundResult(null);
+      setCurrentQuestionIndex((prev) => prev + 1);
+      setSelectedOption(null);
+      setQuestionResult(null);
       setShowExplanation(false);
     }
-  }, [isLastRound, incrementCardBattleRound, completePhase, addScore, addBadge, roundResult, cardBattleCorrect, allCorrect]);
+  }, [
+    isLastQuestion,
+    incrementCardBattleRound,
+    completePhase,
+    addScore,
+    addBadge,
+  ]);
 
   return (
     <div className="p-6 flex flex-col items-center min-h-[500px] relative">
       <motion.h2
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-xl font-bold text-white mb-2"
+        className="text-xl font-bold text-white mb-1"
       >
-        ⚔️ Cosmic Showdown — EC2 vs S3
+        🧠 Cosmic Knowledge Quiz — Mission Recap
       </motion.h2>
-      <p className="text-sm text-cosmic-muted mb-4 text-center">
-        Round {currentRoundIndex + 1} of 3 — Play the correct card to defeat the client requirement!
+      <p className="text-xs text-cosmic-muted mb-4 text-center">
+        Question {currentQuestionIndex + 1} of {TOTAL_QUESTIONS} — Prove you mastered all 8 phases!
       </p>
 
-      {/* Round Progress */}
+      {/* Progress Dots */}
       <div className="flex gap-2 mb-6">
-        {[0, 1, 2].map((r) => (
+        {quizQuestions.map((_, idx) => (
           <motion.div
-            key={r}
+            key={idx}
             className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-mono ${
-              r < currentRoundIndex
+              idx < currentQuestionIndex
                 ? 'border-cosmic-success bg-cosmic-success/20 text-cosmic-success'
-                : r === currentRoundIndex
+                : idx === currentQuestionIndex
                   ? 'border-cosmic-accent bg-cosmic-accent/20 text-cosmic-accent animate-pulse-glow'
                   : 'border-cosmic-border text-cosmic-muted'
             }`}
           >
-            {r < currentRoundIndex ? '✓' : r + 1}
+            {idx < currentQuestionIndex ? '✓' : idx + 1}
           </motion.div>
         ))}
       </div>
 
-      {/* Battle Arena */}
-      <div className="w-full max-w-lg space-y-6">
-        {/* Opponent Card (Client Requirement) */}
+      {/* Quiz Arena */}
+      <div className="w-full max-w-lg space-y-5">
+        {/* Question Card */}
         <motion.div
-          initial={{ opacity: 0, y: -30 }}
+          initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          key={currentRound.id + '-opponent'}
-          className="bg-gradient-to-br from-cosmic-danger/10 to-cosmic-panel/50 border-2 border-cosmic-danger/40 rounded-2xl p-5"
+          key={currentQuestion.id + '-question'}
+          className="bg-gradient-to-br from-cosmic-accent/10 to-cosmic-panel/50 border-2 border-cosmic-accent/40 rounded-2xl p-5"
         >
           <div className="flex items-center gap-3 mb-3">
-            <span className="text-3xl">{currentRound.clientIcon}</span>
+            <motion.span
+              className="text-3xl"
+              animate={{ rotate: [0, 5, -5, 0] }}
+              transition={{ duration: 3, repeat: Infinity }}
+            >
+              {currentQuestion.emoji}
+            </motion.span>
             <div>
-              <p className="text-xs font-mono text-cosmic-danger">AI OPPONENT</p>
-              <p className="text-[10px] text-cosmic-muted">THE CLIENT REQUIREMENT</p>
+              <p className="text-[10px] font-mono text-cosmic-accent/70">
+                RECAP: PHASE {currentQuestion.sourcePhase}
+              </p>
+              <p className="text-xs text-cosmic-muted">CLIENT QUIZ CHALLENGE</p>
             </div>
           </div>
           <motion.p
-            key={currentRound.scenario}
+            key={currentQuestion.question}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="text-sm text-cosmic-text leading-relaxed"
+            className="text-sm text-cosmic-text leading-relaxed font-bold"
           >
-            "{currentRound.scenario}"
+            {currentQuestion.question}
           </motion.p>
         </motion.div>
 
-        {/* VS Divider */}
-        <div className="flex items-center justify-center">
-          <motion.span
-            animate={{ rotate: [0, 360] }}
-            transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-            className="text-3xl"
-          >
-            ⚔️
-          </motion.span>
-          <span className="text-xs font-mono text-cosmic-muted mx-2">VS</span>
-          <motion.span
-            animate={{ rotate: [360, 0] }}
-            transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-            className="text-3xl"
-          >
-            ⚔️
-          </motion.span>
+        {/* Answer Options */}
+        <div className="space-y-3">
+          {currentQuestion.options.map((option, idx) => {
+            let borderClass = 'border-cosmic-border hover:border-cosmic-accent/60';
+            let bgClass = 'bg-cosmic-panel/30';
+            let indicator = null;
+
+            if (selectedOption === idx && questionResult === 'correct') {
+              borderClass = 'border-cosmic-success';
+              bgClass = 'bg-cosmic-success/10';
+              indicator = '✅';
+            } else if (selectedOption === idx && questionResult === 'incorrect') {
+              borderClass = 'border-cosmic-danger';
+              bgClass = 'bg-cosmic-danger/10';
+              indicator = '❌';
+            }
+
+            const isCorrectAnswer = questionResult === 'incorrect' && idx === currentQuestion.correctIndex;
+            if (isCorrectAnswer) {
+              borderClass = 'border-cosmic-success/60';
+              bgClass = 'bg-cosmic-success/5';
+            }
+
+            return (
+              <motion.button
+                key={idx}
+                onClick={() => handleSelectOption(idx)}
+                disabled={selectedOption !== null || phaseCompleted}
+                className={`w-full text-left border-2 rounded-xl px-4 py-3 transition-all duration-300 ${borderClass} ${bgClass} ${
+                  shakeOption === idx ? 'animate-shake' : ''
+                }`}
+                whileHover={!selectedOption ? { scale: 1.02, x: 4 } : {}}
+                whileTap={!selectedOption ? { scale: 0.98 } : {}}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="w-7 h-7 rounded-full border border-cosmic-border flex items-center justify-center text-xs font-mono text-cosmic-muted flex-shrink-0">
+                    {String.fromCharCode(65 + idx)}
+                  </span>
+                  <span className="text-xs text-cosmic-text flex-1">{option}</span>
+                  {indicator && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="text-lg flex-shrink-0"
+                    >
+                      {indicator}
+                    </motion.span>
+                  )}
+                  {isCorrectAnswer && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="text-lg flex-shrink-0"
+                    >
+                      ✅
+                    </motion.span>
+                  )}
+                </div>
+              </motion.button>
+            );
+          })}
         </div>
 
-        {/* Player Cards */}
-        <div className="grid grid-cols-2 gap-4">
-          {/* EC2 Card */}
-          <motion.button
-            onClick={() => handlePlayCard('ec2')}
-            disabled={selectedCard !== null || phaseCompleted}
-            className={`
-              bg-gradient-to-br from-cosmic-accent/10 to-cosmic-panel/50 border-2 rounded-2xl p-5 
-              transition-all duration-300 card-hover text-left
-              ${selectedCard === 'ec2'
-                ? roundResult === 'correct'
-                  ? 'border-cosmic-success bg-cosmic-success/20'
-                  : roundResult === 'incorrect'
-                    ? 'border-cosmic-danger bg-cosmic-danger/20'
-                    : 'border-cosmic-accent'
-                : 'border-cosmic-border hover:border-cosmic-accent/70'
-              }
-              ${shakeCard === 'ec2' ? 'animate-shake border-cosmic-danger' : ''}
-            `}
-            whileHover={!selectedCard ? { scale: 1.03, y: -4 } : {}}
-            whileTap={!selectedCard ? { scale: 0.97 } : {}}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-2xl">🖥️</span>
-              <span className="text-xs font-mono text-cosmic-accent">YOUR CARD</span>
-            </div>
-            <h3 className="text-sm font-bold text-white mb-1">EC2 Server Instance</h3>
-            <p className="text-[10px] text-cosmic-muted leading-relaxed">
-              IaaS Virtual Machine<br />
-              Full OS control (Ubuntu)<br />
-              Runs Node.js, Python, DBs<br />
-              Auto-scaling groups
-            </p>
-            {selectedCard === 'ec2' && roundResult === 'correct' && (
-              <motion.span
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="absolute top-2 right-2 text-cosmic-success text-lg"
-              >
-                ✅
-              </motion.span>
-            )}
-          </motion.button>
-
-          {/* S3 Card */}
-          <motion.button
-            onClick={() => handlePlayCard('s3')}
-            disabled={selectedCard !== null || phaseCompleted}
-            className={`
-              bg-gradient-to-br from-cosmic-glow/10 to-cosmic-panel/50 border-2 rounded-2xl p-5 
-              transition-all duration-300 card-hover text-left relative
-              ${selectedCard === 's3'
-                ? roundResult === 'correct'
-                  ? 'border-cosmic-success bg-cosmic-success/20'
-                  : roundResult === 'incorrect'
-                    ? 'border-cosmic-danger bg-cosmic-danger/20'
-                    : 'border-cosmic-accent'
-                : 'border-cosmic-border hover:border-cosmic-glow/70'
-              }
-              ${shakeCard === 's3' ? 'animate-shake border-cosmic-danger' : ''}
-            `}
-            whileHover={!selectedCard ? { scale: 1.03, y: -4 } : {}}
-            whileTap={!selectedCard ? { scale: 0.97 } : {}}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-2xl">🪣</span>
-              <span className="text-xs font-mono text-cosmic-glow">YOUR CARD</span>
-            </div>
-            <h3 className="text-sm font-bold text-white mb-1">S3 Static Bucket</h3>
-            <p className="text-[10px] text-cosmic-muted leading-relaxed">
-              Serverless Object Storage<br />
-              Zero OS maintenance<br />
-              Infinite automatic scaling<br />
-              Static files only (HTML/CSS/JS)
-            </p>
-            {selectedCard === 's3' && roundResult === 'correct' && (
-              <motion.span
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="absolute top-2 right-2 text-cosmic-success text-lg"
-              >
-                ✅
-              </motion.span>
-            )}
-          </motion.button>
-        </div>
-
-        {/* Result & Explanation */}
+        {/* Explanation */}
         <AnimatePresence>
-          {roundResult === 'correct' && (
+          {showExplanation && questionResult === 'correct' && (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               className="bg-cosmic-success/10 border border-cosmic-success/30 rounded-xl p-4"
             >
               <p className="text-xs font-mono text-cosmic-success font-bold mb-1">
-                ✅ CORRECT CARD PLAYED!
+                ✅ CORRECT! +80 points
               </p>
-              {showExplanation && (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-xs text-cosmic-text"
-                >
-                  {currentRound.explanation}
-                </motion.p>
-              )}
+              <p className="text-xs text-cosmic-text">{currentQuestion.explanation}</p>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Next Round Button */}
+        {/* Next Button */}
         <AnimatePresence>
-          {roundResult === 'correct' && (
+          {questionResult === 'correct' && (
             <motion.button
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              onClick={handleNextRound}
+              onClick={handleNextQuestion}
               className="w-full py-4 rounded-xl font-bold text-sm tracking-wider font-mono
                 bg-cosmic-accent/20 border-2 border-cosmic-accent text-cosmic-accent
                 hover:bg-cosmic-accent/30 transition-all"
               whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(0,240,255,0.4)' }}
               whileTap={{ scale: 0.98 }}
             >
-              {isLastRound ? '🏆 CLAIM VICTORY' : '➡️ NEXT ROUND'}
+              {isLastQuestion ? '🏆 COMPLETE THE MISSION' : `➡️ NEXT QUESTION (${TOTAL_QUESTIONS - currentQuestionIndex - 1} left)`}
             </motion.button>
+          )}
+        </AnimatePresence>
+
+        {/* Celebration effects for correct answer */}
+        <AnimatePresence>
+          {celebrating && (
+            <motion.div
+              className="absolute inset-0 pointer-events-none"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              {Array.from({ length: 12 }).map((_, i) => (
+                <motion.span
+                  key={i}
+                  className="absolute text-lg"
+                  style={{
+                    left: `${Math.random() * 90}%`,
+                    top: `${Math.random() * 90}%`,
+                  }}
+                  initial={{ scale: 0, y: 0 }}
+                  animate={{
+                    scale: [1, 1.5, 0],
+                    y: [-30 - Math.random() * 50, -80 - Math.random() * 60],
+                    opacity: [1, 0.8, 0],
+                  }}
+                  transition={{ duration: 1.5 + Math.random(), ease: 'easeOut' }}
+                >
+                  {['⭐', '🌟', '✨', '💫', '🎯', '🔥'][i % 6]}
+                </motion.span>
+              ))}
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Success Overlay */}
+      {/* Score Display */}
+      <motion.div
+        className="fixed bottom-6 right-6 bg-cosmic-dark/90 border border-cosmic-accent/30 rounded-xl px-4 py-2 font-mono text-xs z-10"
+        animate={{ borderColor: ['rgba(0,240,255,0.3)', 'rgba(0,240,255,0.7)', 'rgba(0,240,255,0.3)'] }}
+        transition={{ duration: 2, repeat: Infinity }}
+      >
+        <span className="text-cosmic-muted">QUIZ SCORE: </span>
+        <span className="text-cosmic-success font-bold">{localCorrect}/{currentQuestionIndex + (questionResult === 'correct' ? 0 : 0)}</span>
+      </motion.div>
+
+      {/* Victory Overlay */}
       <AnimatePresence>
         {phaseCompleted && (
           <motion.div
@@ -324,8 +411,13 @@ export default function Phase8CosmicShowdown() {
             className="absolute inset-0 bg-cosmic-bg/90 flex items-center justify-center rounded-xl z-20"
           >
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-center">
+              <img
+                src={getRandomSuccessGif()}
+                alt="Success"
+                className="w-56 h-56 object-contain rounded-2xl mx-auto mb-3 border-2 border-cosmic-success/50 shadow-[0_0_30px_rgba(0,255,136,0.3)] bg-black/20"
+              />
               <motion.div
-                animate={{ 
+                animate={{
                   rotate: [0, 360],
                   scale: [1, 1.2, 1],
                 }}
@@ -335,13 +427,46 @@ export default function Phase8CosmicShowdown() {
                 🏆
               </motion.div>
               <h2 className="text-3xl font-bold text-cosmic-success mt-4 glow-text">
-                ALL ROUNDS DEFEATED!
+                QUIZ COMPLETE!
               </h2>
-              <p className="text-sm text-cosmic-text mt-2">
-                Perfect score: {cardBattleCorrect}/3 correct deployments. +300 points
+              <p className="text-lg text-cosmic-accent mt-2 font-mono font-bold">
+                {localCorrect}/{TOTAL_QUESTIONS} CORRECT
               </p>
-              <p className="text-xs text-cosmic-accent mt-1">
-                Preparing mission finale...
+              <p className="text-sm text-cosmic-text mt-1">
+                You've proven your cloud deployment mastery! +200 points
+              </p>
+              <p className="text-xs text-cosmic-muted mt-2">
+                The Finale Screen will appear shortly...
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── ROAST OVERLAY ──────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showRoast && roast && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none"
+          >
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0 }}
+              transition={{ type: 'spring', damping: 12, stiffness: 200 }}
+              className="bg-cosmic-dark/90 border-2 border-cosmic-danger/60 rounded-2xl p-5 max-w-sm w-full shadow-[0_0_30px_rgba(255,51,102,0.4)] pointer-events-auto"
+            >
+              <div className="mb-3 rounded-xl overflow-hidden border border-cosmic-danger/30">
+                <img src={roast.gifUrl} alt="roast" className="w-full h-40 object-contain bg-black/30" />
+              </div>
+              <p className="text-lg font-bold text-cosmic-danger text-center glow-text">
+                {roast.text}
+              </p>
+              <p className="text-[9px] font-mono text-cosmic-muted text-center mt-2">
+                Quiz yourself, pilot! 🧠
               </p>
             </motion.div>
           </motion.div>
