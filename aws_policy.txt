@@ -10,3 +10,38 @@
     }
   ]
 }
+
+
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+
+sudo git clone https://github.com/DipeshMajithiaPCSI/devops_orbit.git
+
+sudo apt update
+sudo apt install nginx -y
+
+sudo nano /etc/nginx/sites-available/devops_orbit
+
+server {
+    listen 80;
+    server_name _;
+
+    root /home/ubuntu/devops_orbit;
+    index index.html index.htm;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}
+
+
+sudo ln -s /etc/nginx/sites-available/devops_orbit /etc/nginx/sites-enabled/
+
+sudo nginx -t
+
+sudo systemctl reload nginx
+
+chmod 755 /home/ubuntu
+chmod 755 /home/ubuntu/devops_orbit
+chmod 755 /home/ubuntu/devops_orbit/dist

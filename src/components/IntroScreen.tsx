@@ -9,47 +9,47 @@ interface IntroScreenProps {
 const storyFragments = [
   {
     id: 0,
-    text: "ALERT: MULTIVERSE COLLAPSE IMMINENT... The year is 2026. You are a brilliant student developer. You just finished your final project. You hit 'Run' on your laptop. It works perfectly. You are a genius. Or so you think...",
+    text: "In the beginning... there was nothing.",
     type: "narrator",
   },
   {
     id: 1,
-    text: "You proudly send the link to your Professor, your friends, and a potential employer. 100 people click it at the exact same time. Your laptop smells like burning plastic. The screen freezes. The server is dead. Welcome to the real world.",
+    text: "Well, not *nothing* nothing. There was a man named Jeff who really, REALLY liked warehouses. He built the world's biggest digital warehouse and called it AWS.",
     type: "narrator",
   },
   {
     id: 2,
-    text: "See, humanity has been plagued for decades by a curse known as 'The Localhost Illusion.' Symptoms include: crying in front of a broken monitor and desperately whispering, 'But... it worked on my machine!'",
+    text: "Meanwhile, developers everywhere were suffering from a terrible disease called 'It Works On My Machine.' Symptoms included: boss asking why the site was down, and mumbled excuses about server capacity.",
     type: "narrator",
   },
   {
     id: 3,
-    text: "To save mankind, an elite faction was formed: The DevOps Order. Half software engineer, half infrastructure wizard. They don't just write code; they command the massive, roaring digital warehouses built by the Overlord Jeff (aka AWS).",
+    text: "Then came DevOps — the ancient art of making developers and operations engineers sit in the same room until they learned to be friends. It involved a lot of coffee, automated deployments, and fewer 3 AM phone calls.",
     type: "narrator",
   },
   {
     id: 4,
-    text: "Today, you leave the safety of your local computer. The DevOps Council has granted you access to the cockpit of a cloud-grade starship. To survive the journey, you must master the two Sacred Paths of Power...",
+    text: "YOU have been chosen, brave cadet, to master the two sacred paths of deployment:",
     type: "narrator",
   },
   {
     id: 5,
-    text: "🖥️ PATH A: EC2 (The Iron Titan) — Rent a literal chunk of a supercomputer. You have total control over the operating system. You are god of this machine. But beware: if you forget to patch it, configure the firewall, or reboot it... it WILL explode.",
+    text: "🖥️  EC2 — The mighty virtual machine. Rent a slice of a supercomputer. Full control, but you must feed it updates and whisper `systemctl restart` to it every full moon.",
     type: "ec2",
   },
   {
     id: 6,
-    text: "⭐ PATH B: S3 (The Cosmic Void) — True serverless magic. You hurl your code and files directly into a boundless quantum dimension. No servers to maintain, infinite automatic scaling, and a price tag cheaper than a single college textbook.",
+    text: "⭐  S3 — The serverless star. Hurl your files into the cosmos and AWS handles the rest. No babysitting, just infinite scaling and a bill smaller than your coffee budget.",
     type: "s3",
   },
   {
     id: 7,
-    text: "Your simulation will blast through 8 orbital phases. You'll dodge rogue hackers, configure security groups, and face off against a Boss AI in an EC2 vs S3 deathmatch. If you win, you claim the ultimate treasure: Cloud Sovereignty (and a shiny certificate).",
+    text: "Today, you'll pilot a spaceship through 8 orbital phases: from selecting a home region to battling an AI opponent in the ultimate EC2 vs S3 showdown. There will be dragons (metaphorically), treasure (AWS knowledge), and a very shiny certificate at the end.",
     type: "narrator",
   },
   {
     id: 8,
-    text: "Your peers are watching. Your future career is on the line. The terminal is loaded. Are you ready to become a Cloud Pilot? 🚀",
+    text: "Are you ready to become a CERTIFIED CLOUD PILOT? 🚀",
     type: "final",
   },
 ];
@@ -144,10 +144,10 @@ export default function IntroScreen({ onStart }: IntroScreenProps) {
             <motion.div
               key={i}
               className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full transition-all duration-500 ${i < fragmentIndex
-                  ? 'bg-cosmic-accent/60'
-                  : i === fragmentIndex
-                    ? 'bg-cosmic-accent shadow-[0_0_8px_rgba(0,240,255,0.6)]'
-                    : 'bg-cosmic-border/40'
+                ? 'bg-cosmic-accent/60'
+                : i === fragmentIndex
+                  ? 'bg-cosmic-accent shadow-[0_0_8px_rgba(0,240,255,0.6)]'
+                  : 'bg-cosmic-border/40'
                 }`}
               animate={i === fragmentIndex ? { scale: [1, 1.4, 1] } : {}}
               transition={{ duration: 1.8, repeat: Infinity }}
